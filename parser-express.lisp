@@ -1,5 +1,7 @@
 (in-package :cl-ifc)
 
+(defparameter *bnf-dict* nil)
+
 (defun word-end-syntactic-p (char)
   (member char '(#\Return
                  #\Linefeed
@@ -44,21 +46,36 @@
                     
                     (vector-push-extend char current-word))))
     (setf words (cons current-word words))
-    (setf words (reverse words))
-    (loop for word in words do
-          (format t "~a~%" word))))
+    (setf words (reverse words))))
 
-(defun parse-main (input output)
-  (let ((word (pop input)))
-    (when (string= word "(*")
-      (parse-main (consume-until-close-comment input) output))))
+(defun parse-main (grammar input output)
+  (let ((grammar-head (first grammar)))
+    (format t "~a~%" grammar-head)
+    (cond
+      ;; Head is a rule
+      ((eq (bnf-token-type grammar-head) 'token-rule)
+       (parse-main (gethash (bnf-token-data grammar-head) *bnf-dict*) input output))
+      ;; Head is a literal
+      ((eq (bnf-token-type grammar-head) 'token-literal)
+       (if (equal (bnf-token-data grammar-head) (first input))
+           (if (null grammar)
+               (values input output)
+               (parse-main (rest grammar) input output))
+           (values input nil)))
+      ;; 
+      ((eq )))))
+  
+
   
 
 
 (defun parse-express (filename)
   (let* ((lines (load-file-lines filename))
          (words (lines-to-words lines)))
-    
-    ))
+    (setf *bnf-dict* (cl-ifc:parse-bnf (asdf:system-relative-pathname :cl-ifc "schemas/express.bnf")))
+    (format t "BNF Rule Count : ~a~%" (hash-table-size *bnf-dict*))
+    (format t "Express Word Count : ~a~%" (length words))
+    (parse-main (gethash "syntax" *bnf-dict*) words (list))
+    nil))
 
 
