@@ -1,5 +1,11 @@
 (in-package :cl-ifc)
 
+(defmacro set-temp (location value &body body)
+  (let ((temp-storage (gensym)))
+    `(let ((,temp-storage ,location))
+       (setf ,location ,value)
+       ,@body
+       (setf ,location ,temp-storage))))
 
 ;;; File IO
 
@@ -17,7 +23,9 @@
   (loop for key being each hash-key of table using (hash-value value)
         collect (list key value)))
 
+
 ;;; String Operations
 
 (defun strip-string (string)
+  "Removes the first and last characters of a string (useful if quoted etc)"
   (subseq string 1 (- (length string) 1)))
