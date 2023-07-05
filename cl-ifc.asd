@@ -4,4 +4,5 @@
   :components ((:file "packages")
                (:file "utility")
                (:file "parser-bnf")
+               (:file "compiler-express")
                (:file "parser-express")))

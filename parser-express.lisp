@@ -1,4 +1,4 @@
-(in-package :cl-ifc)
+(in-package :cl-ifc-gen)
 
 (defparameter *bnf-dict* nil)
 
@@ -32,14 +32,15 @@
      (print-debug (format nil  "PREPEND ~a" ,item) 2  ,indent)
      (setf ,list (cons ,item ,list))))
 
+
 (defun compare-literal (literal input output &optional (input-raw input) (indent 0))
   "Checks if 'literal' is present at the beginning of the list 'input'. 
 Returns an mv of equality and the remaining input if true, or the original input if false"
-  (if (if (or (eq (type-of (first literal)) 'symbol) (eq (type-of (first input)) 'symbol))
+  (if (if (or (typep (first literal) 'symbol) (typep (first input) 'symbol))
           (eq (first literal) (first input))
           (char-equal (first literal) (first input)))
       (progn 
-        (prepend output (first literal) indent)
+        (prepend output (first input) indent)
         (if (rest literal)
             (compare-literal (rest literal) (rest input) output input-raw indent)
             (values t (rest input) output)))
@@ -54,25 +55,21 @@ test function be applied to the if"
            ,then
            ,else))))
 
-(defun rule-name-equal (grammar name)
-  (string-equal (bnf-token-data grammar) name))
-
-
-
 
 ;; Token types are OR, LITERAL, GROUP, OPTIONAL, REPEATING, RULE
 (defun parse-main (grammar input output rule-depth)
   (let ((grammar-head (first grammar)))
-;;    (format t "Grammar : ~a~%" grammar)
+    ;;    (format t "Grammar : ~a~%" grammar)
     (cond
-      ;; EXP file is currently on a starting a comment
+      ;; EXP file is currently starting a comment
+      ;; TODO convert this to a check for the 'remark' rule
+      ;; First try just putting it first created an infinite loop 
       ((compare-literal (char-list "(*") input output input rule-depth)
        (print-debug "SKIP comment" 3 rule-depth)
        (parse-continue (cons 'comment-dummy grammar) (consume-comment input output rule-depth) output rule-depth))
-
       ;; Token type GROUP
       ;; Turned off debug print scoping, may not be necessary/meaningful for this one
-      ((eq (bnf-token-type grammar-head) 'token-group)
+      ((eq (bnf-token-type grammar-head) :token-group)
        ;;(print-debug "GROUP 4 {" rule-depth)
        (multiple-value-if (parse-main (bnf-token-data grammar-head) input output (+ 1 rule-depth))
                           (input-new output-new)
@@ -84,7 +81,7 @@ test function be applied to the if"
                             (values nil input output))))
 
       ;; Token type KEYWORD
-      ((eq (bnf-token-type grammar-head) 'token-keyword)
+      ((eq (bnf-token-type grammar-head) :token-keyword)
        (if (eq (bnf-token-data grammar-head) (first input))
            (progn
              (print-debug "KEYWORD Success" 1 rule-depth)
@@ -95,7 +92,7 @@ test function be applied to the if"
       
       ;; Token type LITERAL
       ;; Doesn't use any debug printing as the checking through every letter for simple_ids would make it unreadable
-      ((eq (bnf-token-type grammar-head) 'token-literal)
+      ((eq (bnf-token-type grammar-head) :token-literal)
        ;;(print-debug (format nil "Grammar Construct : Literal ~a" (bnf-token-data grammar-head)))
        (multiple-value-if (compare-literal (string-list (bnf-token-data grammar-head)) input output input rule-depth)
                           (input-new output-new)
@@ -104,7 +101,7 @@ test function be applied to the if"
       
       
       ;; Token type OPTIONAL
-      ((eq (bnf-token-type grammar-head) 'token-optional)
+      ((eq (bnf-token-type grammar-head) :token-optional)
        (print-debug "OPTIONAL {" 3 rule-depth)
        (multiple-value-if (parse-optional (bnf-token-data grammar-head) input output rule-depth)
                           (input-new output-new)
@@ -115,14 +112,14 @@ test function be applied to the if"
                             (print-debug "} OPTIONAL Failure" 3 rule-depth)
                             (parse-continue grammar input output rule-depth))))
       ;; Token type OR
-      ((eq (bnf-token-type grammar-head) 'token-or)
+      ((eq (bnf-token-type grammar-head) :token-or)
        (print-debug "OR " 3 rule-depth)
        (multiple-value-if (parse-or (bnf-token-data grammar-head) input output rule-depth)
                           (input-new output-new)
                           (parse-continue grammar input-new output-new rule-depth)
                           (values nil input output)))
       ;; Token type REPEATING
-      ((eq (bnf-token-type grammar-head) 'token-repeating)
+      ((eq (bnf-token-type grammar-head) :token-repeating)
        (print-debug "REPEATING {" 3 rule-depth)
        (multiple-value-if (parse-repeating (bnf-token-data grammar-head) input output rule-depth)
                           (input-new output-new)
@@ -134,19 +131,28 @@ test function be applied to the if"
                             (values nil input output))))
 
       ;; Token type RULE
-      ((eq (bnf-token-type grammar-head) 'token-rule)
-       (print-debug (format nil "Rule : ~a {" (bnf-token-data grammar-head)) 3 rule-depth)
-       (when (rule-name-equal grammar-head "simple_id")
-         (prepend output 'marker-simple-id rule-depth))
-       (multiple-value-if (parse-main (gethash (bnf-token-data grammar-head) *bnf-dict*) input output (+ 1 rule-depth))
-                          (input-new output-new)
-                          (progn
-                            (print-debug (format nil "} Success ~a" (bnf-token-data grammar-head)) 3 rule-depth)
-                            (parse-continue grammar input-new output-new rule-depth))
-                          (progn
-                            (print-debug (format nil "} Failed ~a" (bnf-token-data grammar-head)) 3 rule-depth)
-                            (values nil input output))))
+      ((eq (bnf-token-type grammar-head) :token-rule)
+       (let* ((rule-name (bnf-token-data grammar-head))
+              (rule-symbol (intern (string-upcase rule-name))))
+         (print-debug (format nil "Rule : ~a {" rule-name) 3 rule-depth)
+         (unless (non-semantic-rule-p rule-symbol) 
+           (prepend output rule-symbol))
+         (multiple-value-if (parse-main (gethash rule-name *bnf-dict*) input output (+ 1 rule-depth))
+                            (input-new output-new)
+                            (progn
+                              (print-debug (format nil "} Success ~a" rule-name) 3 rule-depth)
+                              (if (compileable-rule rule-symbol)
+                                  (progn
+                                    (compile-rule rule-name (reverse output-new))
+                                    (parse-continue grammar input-new (list) rule-depth))
+                                  (parse-continue grammar input-new output-new rule-depth)))
+                            (progn
+                              (print-debug (format nil "} Failed ~a" rule-name) 3 rule-depth)
+                              (values nil input output)))))
       )))
+
+
+
 
 
 (defun parse-continue (grammar input output rule-depth)
@@ -197,14 +203,17 @@ Continues or exits depending on whether there is still grammar to check"
          (values input-new output-new)
          (consume-comment (rest input) output rule-depth)))
 
+(defun kic-p (character)
+  "Predicate for Keyword Indicator Character. Discounts a possible keyword if appears on either side"
+  (or (alphanumericp character)
+      (char= character #\_)
+      (char= character #\')))
 
 (defun compare-keyword (literal input &optional (input-raw input))
   (if (char-equal (first literal) (first input))
       (if (rest literal)
           (compare-keyword (rest literal) (rest input) input-raw)
-          (if (or (alphanumericp (second input))
-                  (char= (second input) #\_)
-                  (char= (second input) #\'))
+          (if (kic-p (second input))
               (values nil input-raw)
               (values t (rest input))))
       (values nil input-raw)))
@@ -217,9 +226,7 @@ Continues or exits depending on whether there is still grammar to check"
       (multiple-value-bind (compare-success input-new)
           (compare-keyword (string-list (first remaining-keywords)) input)
         (if (and compare-success
-                 (not (alphanumericp input-last))
-                 (not (char= #\_ input-last))
-                 (not (char= #\' input-last)))
+                 (not (kic-p input-last)))
             (progn
               ;;(format t "Convert : ~a -> ~a ~%" (first remaining-keywords) (subseq input 0 10))
               (convert-exp-keywords input-new
@@ -245,7 +252,7 @@ Continues or exits depending on whether there is still grammar to check"
 (defun parse-express (filename)
   ;; First load the grammar dictionary from bnf
   (multiple-value-bind (bnf-dict keywords)
-      (cl-ifc:parse-bnf (asdf:system-relative-pathname :cl-ifc "schemas/express.bnf"))
+      (parse-bnf (asdf:system-relative-pathname :cl-ifc "schemas/express.bnf"))
     (setf *bnf-dict* bnf-dict) ;; Set to a global variable for debug checking
 
     ;; Load the .exp file as a flat list of characters
@@ -266,8 +273,7 @@ Continues or exits depending on whether there is still grammar to check"
           (parse-main (gethash "syntax" *bnf-dict*) characters (list) 0)
         (format t "~%Parse success : ~a~%" success-p)
         (format t "Parse remaining input length : ~a~%" (length input))
-        (format t "Parse output length : ~a~%~%" (length  output))
-        (format t "~a~%" (reverse output)))
+        (format t "Parse output length : ~a~%~%" (length  output)))
       nil )))
 
 

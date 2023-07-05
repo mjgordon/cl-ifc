@@ -1,4 +1,4 @@
-(in-package :cl-ifc)
+(in-package :cl-ifc-gen)
 
 (defmacro set-temp (location value &body body)
   (let ((temp-storage (gensym)))

@@ -1,14 +1,29 @@
-(in-package :cl-ifc)
+(in-package :cl-ifc-gen)
 
+
+(deftype bt-type ()
+  `(member :token-none
+           :token-keyword
+           :token-literal
+           :token-rule
+           :token-group
+           :token-or
+           :token-optional
+           :token-repeating))
+
+(deftype bt-data ()
+  `(or list 
+       bnf-token
+       symbol
+       string))
 
 (defstruct bnf-token
-  (type)
-  (data))
-
+  (type :token-none :type bt-type)
+  (data  nil :type bt-data))
 
 (defun is-or (item)
-  (and (eq (type-of item) 'bnf-token)
-       (eq (bnf-token-type item) 'token-or)))
+  (and (bnf-token-p item)
+       (eq (bnf-token-type item) :token-or)))
 
 
 (defun output-add (output item)
@@ -21,7 +36,11 @@
     output))
 
 
+;; parse-bnf-rule and parse-bnf-continue call each other in a circle,
+;; so we need to forward-declare parse-bnf-rule
+(declaim (ftype (function (list list (or simple-array null)) (values t t)) parse-bnf-rule))
 (defun parse-bnf-continue (input output closer)
+  "Called after each possible type of bnf token, decides whether to continue"
   (if (or (null (rest input))
           (string= (second input) closer))
       (progn
@@ -34,6 +53,7 @@
 
 
 (defun parse-bnf-rule (input output closer)
+  "Parse a single line from the bnf file"
   ;;(format t "I: ~a~%" input)
   ;;(format t "O: ~a~%" output)
   ;;(format t "C: ~a~%~%" closer)
@@ -49,17 +69,17 @@
              (setf (bnf-token-data (first (bnf-token-data (first output))))
                    (reverse (bnf-token-data (first (bnf-token-data (first output))))))
              ;; Then add the new blank group
-             (setf (bnf-token-data (first output)) (cons (make-bnf-token :type 'token-group
+             (setf (bnf-token-data (first output)) (cons (make-bnf-token :type :token-group
                                                                          :data nil)
                                                          (bnf-token-data (first output))))
              ;; Then continue parsing
              (parse-bnf-continue input output closer))
            ;; Otherwise, turn the existing output rule list into an implicit group in the or statement
            (parse-bnf-continue input
-                               (list (make-bnf-token :type 'token-or
-                                                     :data (list (make-bnf-token :type 'token-group
+                               (list (make-bnf-token :type :token-or
+                                                     :data (list (make-bnf-token :type :token-group
                                                                                  :data nil)
-                                                                 (make-bnf-token :type 'token-group
+                                                                 (make-bnf-token :type :token-group
                                                                                  :data (reverse output)))))
                                closer)))
       ;; Keyword
@@ -70,14 +90,14 @@
             (or  (uiop/utility:string-enclosed-p #\' part #\') ;; And the content is a quoted literal
                  (uiop/utility:string-enclosed-p #\" part #\")))
        (parse-bnf-continue input
-                           (output-add output (make-bnf-token :type 'token-keyword
+                           (output-add output (make-bnf-token :type :token-keyword
                                                               :data (intern (strip-string part))))
                            closer))
       ;; Literal string
       ((or  (uiop/utility:string-enclosed-p #\' part #\')
             (uiop/utility:string-enclosed-p #\" part #\"))
        (parse-bnf-continue input
-                           (output-add output (make-bnf-token :type 'token-literal
+                           (output-add output (make-bnf-token :type :token-literal
                                                               :data (strip-string part)))
                            closer))
       ;; Group
@@ -85,7 +105,7 @@
        (multiple-value-bind (input-new output-new)
            (parse-bnf-rule (rest input) (list) ")")
          (parse-bnf-continue input-new
-                             (output-add output (make-bnf-token :type 'token-group
+                             (output-add output (make-bnf-token :type :token-group
                                                                 :data output-new))
                              closer)))
       ;; Optional
@@ -93,7 +113,7 @@
        (multiple-value-bind (input-new output-new )
            (parse-bnf-rule (rest input) (list) "]")
          (parse-bnf-continue input-new
-                             (output-add output (make-bnf-token :type 'token-optional
+                             (output-add output (make-bnf-token :type :token-optional
                                                    :data output-new))
                              closer)))
       ;; Repeating
@@ -101,37 +121,20 @@
        (multiple-value-bind (input-new output-new)
            (parse-bnf-rule (rest input) (list) "}")
          (parse-bnf-continue input-new
-                             (output-add output (make-bnf-token :type 'token-repeating
+                             (output-add output (make-bnf-token :type :token-repeating
                                                                 :data output-new))
                              closer)))
       ;; Default, rule expansion
       (t
        (parse-bnf-continue input
-                           (output-add output (make-bnf-token :type 'token-rule
+                           (output-add output (make-bnf-token :type :token-rule
                                                               :data part))
                            closer)))
     ))
 
-(defun get-keywords (dict)
-  (let ((output (list)))
-    (maphash #'(lambda (key val)
-                 (when (and (eq  (length val) 1)
-                            (string= key (string-upcase key))
-                            (eq (bnf-token-type (first val)) 'token-literal))
-                   (setf output (cons (bnf-token-data (first val)) output))))
-             dict)
-    output))
-
-
-(defun convert-dict-keywords (dict keywords)
-  (mapcar #'(lambda (keyword)
-              (setf (gethash (string-upcase keyword) dict) (intern keyword)))
-          keywords)
-  dict)
-
 
 (defun parse-bnf (filename)
-  "Loads a .bnf grammar file and returns a list of rules"
+  "Loads a .bnf grammar file and returns a dictionary of rules and a list of keywords"
   (let ((lines (load-file-lines filename))
         (rules (make-hash-table :test #'equal))
         (keywords (list)))
@@ -145,7 +148,7 @@
                 (parse-bnf-rule content (list) nil)
               (declare (ignore remaining-input))
               (setf (gethash name rules) output)
-              (when (eq (bnf-token-type (first output)) 'token-keyword)
+              (when (eq (bnf-token-type (first output)) :token-keyword)
                 ;;(format t "Keyword : ~a~%" name)
                 (setf keywords (cons name keywords))))))
     (values rules keywords)))
