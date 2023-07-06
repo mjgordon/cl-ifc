@@ -3,6 +3,4 @@
   (:export :parse-express))
 
 
-(defpackage :cl-ifc
-  (:use :cl :asdf)
-  (:export :parse-bnf))
+(defpackage :cl-ifc)

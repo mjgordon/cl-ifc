@@ -91,7 +91,7 @@
                  (uiop/utility:string-enclosed-p #\" part #\")))
        (parse-bnf-continue input
                            (output-add output (make-bnf-token :type :token-keyword
-                                                              :data (intern (strip-string part))))
+                                                              :data (intern (string-upcase (strip-string part)))))
                            closer))
       ;; Literal string
       ((or  (uiop/utility:string-enclosed-p #\' part #\')
@@ -131,6 +131,13 @@
                                                               :data part))
                            closer)))
     ))
+
+
+(defmacro define-keyword-type (&rest keywords)
+  (let ((keyword-symbols (mapcar #'intern keywords))) 
+    `(deftype keyword-type ()
+       (member @,keyword-symbols)
+       )))
 
 
 (defun parse-bnf (filename)
