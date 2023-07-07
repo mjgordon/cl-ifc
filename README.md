@@ -1,4 +1,7 @@
-Utility to load and extract information from IFC files in Common Lisp.
-Very early, not currently functional.
+IFC format implementation in Common Lisp.  
+Planned Features:  
+- Local IFC types, entities, functions, and rules generated from the standard.  
+- File loader for IFC step files  
+  
+In Progress  
 
-General plan is to automatically generate CLOS classes at compile time by parsing the IFC EXPRESS schemas. 

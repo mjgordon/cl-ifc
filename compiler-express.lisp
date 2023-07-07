@@ -39,12 +39,14 @@
           (nil nil)))))
 
 (defun data-dive (data count)
+  "Returns an exp-token 'count' number of data layers deep"
   (if (= 0 count)
       data
       (data-dive (first (exp-token-data data)) (- count 1))))
 
 
 (defun build-deftype (type-id underlying-type where-clause)
+  "Returns a deftype code string, to be used with (eval)"
 ;;  (format t "Underlying type : ~a~%" underlying-type)
   `(deftype ,type-id ()
      ,(if-let (concrete-type (token-drill underlying-type 'concrete_types))
@@ -53,8 +55,7 @@
            (let ((ref-name (exp-token-data (data-dive  concrete-type 3))))
              `',(intern (string-from-char-list ref-name) :cl-ifc)))
           (simple_types
-           (let* ((simple-type (first (exp-token-data concrete-type)))
-                  (simple-type-name (exp-token-name (first (exp-token-data simple-type)))))
+           (let ((simple-type-name (exp-token-name (data-dive concrete-type 2)) ))
              (case simple-type-name
                (boolean_type ''boolean)
                (real_type ''real)))))
