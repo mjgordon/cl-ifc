@@ -1,6 +1,8 @@
 (in-package :cl-ifc-gen)
 
 (defparameter *bnf-dict* nil)
+(defparameter *bnf-keywords* nil)
+(defparameter *exp-characters* nil)
 
 (defstruct exp-token
   (name nil :type symbol)
@@ -222,7 +224,34 @@ Continues or exits depending on whether there is still grammar to check"
                                       (first input)
                                       (cons (first input) output)
                                       keywords))))))
-  
+
+(defun just-load-bnf ()
+  (multiple-value-bind (bnf-dict keywords)
+      (parse-bnf (asdf:system-relative-pathname :cl-ifc "schemas/express.bnf"))
+    (setf *bnf-dict* bnf-dict)
+    (setf *bnf-keywords* keywords)
+    t))
+
+(defun just-load-express ()
+  (let* ((lines (load-file-lines (asdf:system-relative-pathname :cl-ifc "schemas/IFC2X3_TC1.exp")))
+         (characters (lines-to-characters lines)))
+
+    ;; Convert all instances of bnf keywords in the character list to symbols
+    (format t "Converting keywords~%")
+    (set-temp *debug-level* 0 
+      (setf characters (convert-exp-keywords characters nil (list) *bnf-keywords*)))
+
+    (setf *exp-characters* characters))
+  t)
+
+(defun just-parse-express ()
+  (multiple-value-bind (success-p input output)
+      (parse-main (gethash "syntax" *bnf-dict*) *exp-characters* (list) 0)
+    (format t "~%Parse success : ~a~%" success-p)
+    (format t "Parse remaining input length : ~a~%" (length input))
+    (format t "Parse output length : ~a~%~%" (length  output))
+    (format t "~a~%" output))
+  )
 
 (defun parse-express (filename)
   ;; Clear the destination package (the below didn't work right)
@@ -241,7 +270,7 @@ Continues or exits depending on whether there is still grammar to check"
       ;; Convert all instances of bnf keywords in the character list to symbols
       (format t "Converting keywords~%")
       (set-temp *debug-level* 0 
-                (setf characters (convert-exp-keywords characters nil (list) keywords)))
+        (setf characters (convert-exp-keywords characters nil (list) keywords)))
       
       (format t "Converting keywords finished~%")
       
@@ -255,5 +284,3 @@ Continues or exits depending on whether there is still grammar to check"
         (format t "Parse output length : ~a~%~%" (length  output))
         (format t "~a~%" output))
       nil )))
-
-
