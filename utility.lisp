@@ -2,11 +2,13 @@
 
 (defparameter *debug-level* 0)
 
+
 ;;; Control Flow
 
 (defmacro if-let ((var test-form) then-form &optional else-form)
   `(let ((,var ,test-form))
      (if ,var ,then-form ,else-form)))
+
 
 (defmacro multiple-value-if (test values-list then else)
   "Combines a multiple-value-bind and if statement, with the assumption that the first returned value of the
@@ -79,7 +81,7 @@ test function be applied to the if"
   (format nil "~{~A~}" characters))
 
 
-(defun strip-string (string)
+(defun strip-sequence (string)
   "Removes the first and last characters of a string (useful if quoted etc)"
   (subseq string 1 (- (length string) 1)))
 

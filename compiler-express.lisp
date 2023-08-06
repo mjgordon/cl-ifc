@@ -51,23 +51,27 @@
       data
       (data-dive (first (exp-token-data data)) (- count 1))))
 
+
 (defun build-aggregate (aggregate)
   (let ((entries (list)))
-    (loop :for entry :in (exp-token-data aggregate) :do
-          (if-let (literal (token-drill entry 'simple_string_literal))
+    (loop :for entry :in (strip-sequence  (exp-token-data aggregate)) :by #'cddr :do
+          (if-let (literal (token-drill entry 'simple_string_literal)) ;; ?
             (setf entries (cons (string-from-char-list (exp-token-data literal)) entries))))
     entries))
 
-(defun build-domain-rule (wr)
-  (let ((rule-label (first (exp-token-data wr)))
-        (rule-expression (third (exp-token-data wr))))
+
+(defun build-type-predicate (wr type-id)
+  (let* ((rule-label (string-from-char-list (exp-token-data (first (exp-token-data (first (exp-token-data wr)))))))
+         (predicate-name (intern  (format nil "predicate-~a-~a" type-id rule-label) :cl-ifc))
+         (rule-expression (third (exp-token-data wr))))
     (when (> (length (exp-token-data rule-expression)) 1)
       (let ((expression-start (first (exp-token-data rule-expression)))
             (rel-op-expression (second (exp-token-data rule-expression)))
             (expression-end (third (exp-token-data rule-expression))))
         (when (token-drill rel-op-expression 'in)
-          `(member ,(build-aggregate (token-drill expression-end 'aggregate_initializer))))))))
-
+          (list predicate-name
+                `(defun ,predicate-name (object)
+                   (member object (list ,@(build-aggregate (token-drill expression-end 'aggregate_initializer)))))))))))
 
 
 (defun build-underlying-type (underlying-type)
@@ -81,21 +85,25 @@
           (case simple-type-name
             (boolean_type ''boolean)
             (real_type ''real)))))
-     
      nil))
 
 
 (defun build-deftype (type-id underlying-type where-clause)
   "Returns a deftype code string, to be used with (eval)"
   ;;  (format t "Underlying type : ~a~%" underlying-type)
-  
-  `(deftype ,type-id ()
-     ,(if (token-drill where-clause 'where)
-          
-          `(and ,(build-underlying-type underlying-type)
-                ,(loop :for rule :in (rest (exp-token-data where-clause)) :by #'cddr
-                       :collect (build-domain-rule rule) ))
-          (build-underlying-type underlying-type))))
+  (if (token-drill where-clause 'where)
+      (let* ((predicate-pairs (loop :for rule :in (rest (exp-token-data where-clause)) :by #'cddr
+                                    :collect (build-type-predicate rule type-id)))
+             (predicate-satisfies (loop :for pair :in predicate-pairs
+                                        :collect `(satisfies ,(first pair))))
+             (predicate-defuns (mapcar #'second predicate-pairs))
+             (and-clause `(and ,(build-underlying-type underlying-type)
+                               ,@predicate-satisfies)))
+        `(progn ,@predicate-defuns
+                (deftype ,type-id ()
+                  ',and-clause)))
+      `(deftype ,type-id ()
+         ,(build-underlying-type underlying-type))))
 
 
 (defun compile-rule (rule input)

@@ -23,6 +23,7 @@
   (prove:ok (not (typep "string" type)) type)
   (prove:finalize))
 
+
 (defun run-type-tests ()
   (format t "Testing Type Definitions~%")
   (test-type-simple-real 'cl-ifc::|IfcAbsorbedDoseMeasure|)
@@ -33,8 +34,6 @@
   (test-type-simple-boolean 'cl-ifc::|IfcBoolean|))
 
 
-
 (defun run-cl-ifc-tests ()
   (setf prove:*default-reporter* :fiveam)
-  (run-type-tests)
-  )
+  (run-type-tests))

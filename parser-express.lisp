@@ -232,6 +232,7 @@ Continues or exits depending on whether there is still grammar to check"
     (setf *bnf-keywords* keywords)
     t))
 
+
 (defun just-load-express ()
   (let* ((lines (load-file-lines (asdf:system-relative-pathname :cl-ifc "schemas/IFC2X3_TC1.exp")))
          (characters (lines-to-characters lines)))
@@ -244,6 +245,7 @@ Continues or exits depending on whether there is still grammar to check"
     (setf *exp-characters* characters))
   t)
 
+
 (defun just-parse-express ()
   (multiple-value-bind (success-p input output)
       (parse-main (gethash "syntax" *bnf-dict*) *exp-characters* (list) 0)
@@ -252,6 +254,7 @@ Continues or exits depending on whether there is still grammar to check"
     (format t "Parse output length : ~a~%~%" (length  output))
     (format t "~a~%" output))
   )
+
 
 (defun parse-express (filename)
   ;; Clear the destination package (the below didn't work right)

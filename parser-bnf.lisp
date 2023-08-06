@@ -86,19 +86,19 @@
       ((and (null closer) ;; If we're toplevel
             (eq (length input) 1) ;; And there's only one word in the input
             (null output) ;; But not because we've already processed the others
-            (not (string-equal ";" (strip-string  part))) ;; And we explicity ignore the "null_stmt = ';'" rule
+            (not (string-equal ";" (strip-sequence  part))) ;; And we explicity ignore the "null_stmt = ';'" rule
             (or  (uiop/utility:string-enclosed-p #\' part #\') ;; And the content is a quoted literal
                  (uiop/utility:string-enclosed-p #\" part #\")))
        (parse-bnf-continue input
                            (output-add output (make-bnf-token :type :token-keyword
-                                                              :data (intern (string-upcase (strip-string part)))))
+                                                              :data (intern (string-upcase (strip-sequence part)))))
                            closer))
       ;; Literal string
       ((or  (uiop/utility:string-enclosed-p #\' part #\')
             (uiop/utility:string-enclosed-p #\" part #\"))
        (parse-bnf-continue input
                            (output-add output (make-bnf-token :type :token-literal
-                                                              :data (strip-string part)))
+                                                              :data (strip-sequence part)))
                            closer))
       ;; Group
       ((string= part "(")
