@@ -117,7 +117,7 @@ Returns an mv of equality and the remaining input if true, or the original input
                               (print-debug (format nil "} Success ~a" rule-name) 3 rule-depth)
                               (if (compileable-rule rule-symbol)
                                   (progn
-                                    (compile-rule rule-symbol (reverse output-new))
+                                    (compile-bnf-rule rule-symbol (reverse output-new))
                                     (parse-continue grammar input-new (list) rule-depth))
                                   (progn
                                     (if (non-semantic-rule-p rule-symbol)

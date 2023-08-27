@@ -4,4 +4,4 @@ Planned Features:
 - File loader for IFC step files  
   
 In Progress  
-
+Compiled through IfcComplexNumber
