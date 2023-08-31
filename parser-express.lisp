@@ -4,6 +4,9 @@
 (defparameter *bnf-keywords* nil)
 (defparameter *exp-characters* nil)
 
+
+;;; === Helper Functions ===
+
 (defstruct exp-token
   (name nil :type symbol)
   data)
@@ -13,6 +16,26 @@
   `(progn
      (print-debug (format nil  "PREPEND ~a" ,item) 2  ,indent)
      (setf ,list (cons ,item ,list))))
+
+
+(defun compileable-rule (rule)
+  (not (null 
+        (member rule '(entity_decl
+                       function_decl
+                       rule_decl
+                       type_decl
+                       schema_id)))))
+
+
+(defun non-semantic-rule-p (rule)
+  "Non-semantic rules don't produce new tokens"
+  (member rule '(declaration
+                 digit
+                 digits
+                 letter
+                 not_paren_star_quote_special
+                 not_quote
+                 schema_body)))
 
 
 (defun compare-literal (literal input output &optional (input-raw input) (indent 0))
@@ -29,7 +52,7 @@ Returns an mv of equality and the remaining input if true, or the original input
       (values nil input-raw output)))
 
 
-
+;;; === Parse Functions ===
 
 
 ;; Token types are OR, LITERAL, GROUP, OPTIONAL, REPEATING, RULE
