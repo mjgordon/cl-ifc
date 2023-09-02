@@ -2,6 +2,8 @@
 
 (defparameter *print-type-defs* t)
 
+(defparameter *verbose-flag* nil)
+
 ;;; === Helper Functions ===
 
 
@@ -16,7 +18,7 @@
   "Syntax for working with a token tree of unknown structure
 Each 'is' expression calls its body if the name of the current token level matches its first argument.
 The body can use '?level-name' and '?level-data' to refer to the contents of the current level's token"
-  `(let* ((?level-token (token-drill ,token-original (butlast ,path)))
+  `(let* ((?level-token (token-drill ,token-original ,path))
           (?level-name (exp-token-name ?level-token))
           (?level-data (exp-token-data ?level-token)))
      (declare (ignorable ?level-name ?level-data))
@@ -26,7 +28,7 @@ The body can use '?level-name' and '?level-data' to refer to the contents of the
                          (check (second clause))
                          (clause-body (cddr clause)))
                      (if (eq verb 'is)
-                         `((eq (exp-token-name (token-drill ,token-original ,path)) ,check)
+                         `((eq (exp-token-name (first ?level-data)) ,check)
                            (explore-token ,token-original (list ,@(append (rest path) (list 0))) ,@clause-body))
                          `(t ,clause)))))))
 
@@ -35,16 +37,15 @@ The body can use '?level-name' and '?level-data' to refer to the contents of the
   "Solves for a numeric expression at compile-time to include a constant in the output"
 ;;  (format t "Numeric Expression : ~a~%" token-numeric-expression)
   (explore-token token-numeric-expression nil
-                 (is 'numeric_expression
-                     (is 'simple_expression
-                         (is 'term
-                             (is 'factor
-                                 (is 'simple_factor
-                                     (is 'primary
-                                         (is 'literal
-                                             (is 'real_literal
-                                                 (is 'integer_literal
-                                                     (parse-integer (format nil "~a" (first ?level-data))))))))))))))
+                 (is 'simple_expression
+                     (is 'term
+                         (is 'factor
+                             (is 'simple_factor
+                                 (is 'primary
+                                     (is 'literal
+                                         (is 'real_literal
+                                             (is 'integer_literal
+                                                 (parse-integer (format nil "~a" (first ?level-data)))))))))))))
 
 
 
@@ -83,7 +84,7 @@ The body can use '?level-name' and '?level-data' to refer to the contents of the
 
 
 (defun build-predicate-domain-rule (dr type-id)
-  (format t "Domain rule for ~a : ~% ~a~%" type-id dr)
+  (when *verbose-flag* (format t "Domain rule for ~a : ~% ~a~%" type-id dr))
   (let* ((rule-label (string-from-char-list (exp-token-data (first (exp-token-data (first (exp-token-data dr)))))))
          (predicate-name (intern  (format nil "predicate-~a-~a" type-id rule-label) :cl-ifc))
          ;; First is rule label
@@ -223,15 +224,15 @@ The body can use '?level-name' and '?level-data' to refer to the contents of the
         (type-id (intern (string-from-char-list (exp-token-data (first (exp-token-data (second input)))))
                          :cl-ifc))
         ;; Third is equals sign
-        (underlying-type (first (exp-token-data  (fourth input))))
+        (underlying-type (fourth input))
         ;; Fifth is semicolon
         (where-clause (sixth input)))
     
-    ;; For dev: get info on a specific type 
-    (when (eq type-id 'cl-ifc::|IfcCompoundPlaneAngleMeasure2|)
-      ;;(defparameter *test-type* input)
-      ;;(defparameter *test-underlying* (fourth *complex-test*))
-      (format t "~%~a~%" input))
+    ;; For dev: get info on a specific type
+    (setf *verbose-flag* (eq type-id 'cl-ifc::|IfcCompoundPlaneAngleMeasure|))
+
+
+    ;;(when *verbose-flag* (format t "~a~%" input))
 
     (let ((deftype-code (build-deftype type-id underlying-type where-clause)))
       (when *print-type-defs*
