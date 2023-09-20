@@ -31,7 +31,6 @@
   "Non-semantic rules don't produce new tokens"
   (member rule '(declaration
                  digit
-                 digits
                  letter
                  not_paren_star_quote_special
                  not_quote
